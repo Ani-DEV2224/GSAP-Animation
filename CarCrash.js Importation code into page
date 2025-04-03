@@ -1,0 +1,9 @@
+import CarCrash from "@/components/CarCrash";
+
+export default function Home() {
+  return (
+    <main style={{ background: "#99b350", height: "100vh" }}>
+      <CarCrash />
+    </main>
+  );
+}
