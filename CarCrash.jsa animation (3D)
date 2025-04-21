@@ -1,67 +1,7 @@
-"use client";
-
-import { Canvas } from "@react-three/fiber";
-import { useGLTF, Environment, Html } from "@react-three/drei";
-import { Physics, useBox } from "@react-three/cannon";
-import { Suspense, useRef, useState } from "react";
-import { gsap } from "gsap";
-
-export default function CarCrash() {
-  return (
-    <div className="canvas-container">
-      <Canvas camera={{ position: [0, 2, 10], fov: 50 }}>
-        <Suspense fallback={<Html>Loading...</Html>}>
-          <Environment preset="city" />
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[5, 5, 5]} />
-          <Physics>
-            <CarScene />
-          </Physics>
-        </Suspense>
-      </Canvas>
-    </div>
-  );
-}
-
-function CarScene() {
-  const car1Ref = useRef();
-  const car2Ref = useRef();
-  const [showLogo, setShowLogo] = useState(false);
-
-  const car1 = useGLTF("/models/car1.gltf");
-  const car2 = useGLTF("/models/car2.gltf");
-
-  const [car1PhysicsRef] = useBox(() => ({
-    mass: 1,
-    position: [-5, 0.5, 0],
-    args: [2, 1, 4],
-  }));
-
-  const [car2PhysicsRef] = useBox(() => ({
-    mass: 1,
-    position: [5, 0.5, 0],
-    args: [2, 1, 4],
-  }));
-
-  const triggerCrash = () => {
-    gsap.to(car1PhysicsRef.current.position, {
-      x: 0,
-      duration: 1.5,
-      ease: "power3.out",
-    });
-
-    gsap.to(car2PhysicsRef.current.position, {
-      x: 0,
-      duration: 1.5,
-      ease: "power3.out",
-      onComplete: () => {
-        setShowLogo(true);
-      },
-    });
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
-    <title>Car Crash Animation - Gillani Law</title>
+    <title>Realistic Car Crash Scene</title>
     <style>
         body { margin: 0; }
         canvas { display: block; }
@@ -70,6 +10,7 @@ function CarScene() {
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
     <script>
         // Scene setup
         const scene = new THREE.Scene();
@@ -78,57 +19,157 @@ function CarScene() {
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Add lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-        const pointLight = new THREE.PointLight(0xffffff, 1);
-        pointLight.position.set(25, 50, 25);
-        scene.add(pointLight);
+        // Add realistic sky
+        const sky = new THREE.Sky();
+        sky.scale.setScalar(10000);
+        scene.add(sky);
 
-        // Create logo
-        let logoMesh = null;
-        const textureLoader = new THREE.TextureLoader();
-        textureLoader.load(
-            'https://gillanilaw.com/wp-content/uploads/2023/11/GL-Logo.png', // Update with actual logo path
-            (texture) => {
-                const logoMaterial = new THREE.MeshBasicMaterial({
-                    map: texture,
-                    transparent: true,
-                    opacity: 0
-                });
-                const logoGeometry = new THREE.PlaneGeometry(12, 6); // Adjust aspect ratio as needed
-                logoMesh = new THREE.Mesh(logoGeometry, logoMaterial);
-                logoMesh.position.set(0, 8, -5); // Position above crash scene
-                logoMesh.visible = false;
-                scene.add(logoMesh);
-            },
-            undefined,
-            (err) => {
-                console.error('Error loading logo:', err);
+        const skyUniforms = sky.material.uniforms;
+        skyUniforms['turbidity'].value = 1;
+        skyUniforms['rayleigh'].value = 1;
+        skyUniforms['mieCoefficient'].value = 0.005;
+        skyUniforms['mieDirectionalG'].value = 0.8;
+        skyUniforms['sunPosition'].value.set(0, 100, -50);
+
+        // Enhanced lighting
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+        hemiLight.position.set(0, 100, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(-0.5, 1, -0.5);
+        scene.add(dirLight);
+
+        // Create terrain with mountains
+        function createMountain() {
+            const geometry = new THREE.PlaneGeometry(200, 200, 50, 50);
+            const material = new THREE.MeshPhongMaterial({ color: 0x4d3900 });
+            
+            // Displace vertices to create mountain shapes
+            const vertices = geometry.attributes.position.array;
+            for(let i = 0; i < vertices.length; i += 3) {
+                vertices[i + 2] = Math.random() * 30; // Z-axis displacement
             }
-        );
+            
+            const mountain = new THREE.Mesh(geometry, material);
+            mountain.rotation.x = -Math.PI / 2;
+            mountain.position.y = -2;
+            return mountain;
+        }
 
-        // ... [Keep all car creation code from previous version] ...
+        // Add mountains around the scene
+        scene.add(createMountain().rotateZ(Math.PI/4));
+        scene.add(createMountain().rotateZ(-Math.PI/4));
+
+        // Create road
+        const roadGeometry = new THREE.PlaneGeometry(20, 200);
+        const roadMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+        road.position.y = -1.9;
+        scene.add(road);
+
+        // Add road markings
+        function createRoadMarking() {
+            const marking = new THREE.Mesh(
+                new THREE.BoxGeometry(2, 0.2, 0.5),
+                new THREE.MeshPhongMaterial({ color: 0xffff00 })
+            );
+            marking.position.z = Math.random() * 100 - 50;
+            return marking;
+        }
+
+        for(let i = 0; i < 20; i++) {
+            const marking = createRoadMarking();
+            marking.position.x = i % 2 === 0 ? -0.5 : 0.5;
+            scene.add(marking);
+        }
+
+        // Create trees
+        function createTree() {
+            const tree = new THREE.Group();
+            
+            // Trunk
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.3, 0.5, 3),
+                new THREE.MeshPhongMaterial({ color: 0x4a2b0f })
+            );
+            
+            // Leaves
+            const leaves = new THREE.Mesh(
+                new THREE.SphereGeometry(2),
+                new THREE.MeshPhongMaterial({ color: 0x00ff00 })
+            );
+            leaves.position.y = 2;
+            
+            tree.add(trunk, leaves);
+            return tree;
+        }
+
+        // Add trees on both sides of the road
+        for(let i = -80; i < 80; i += 10) {
+            const tree1 = createTree();
+            tree1.position.set(-12, -2, i);
+            scene.add(tree1);
+
+            const tree2 = createTree();
+            tree2.position.set(12, -2, i);
+            scene.add(tree2);
+        }
+
+        // ... [Keep previous car creation code from earlier version] ...
+        // ... [Keep logo implementation code from previous version] ...
+
+        // Position camera
+        camera.position.set(0, 15, 30);
+        camera.lookAt(0, 0, 0);
 
         // Animation variables
         let crashOccurred = false;
-        let logoVisible = false;
-        const crashPosition = 0;
         const speed = 0.3;
 
-        // Enhanced logo animation
-        function showLogo() {
-            if(!logoMesh) return;
-            
-            logoMesh.visible = true;
-            logoMesh.material.opacity = Math.min(1, logoMesh.material.opacity + 0.015);
-            logoMesh.position.y += (8.5 - logoMesh.position.y) * 0.05;
-            logoMesh.scale.x = logoMesh.scale.y = Math.min(1, logoMesh.scale.x + 0.015);
-            
-            // Maintain camera-facing position
-            logoMesh.quaternion.copy(camera.quaternion);
+        // Controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            if(!crashOccurred) {
+                car1.position.x += speed;
+                car2.position.x -= speed;
+
+                if(car1.position.x >= 0 && car2.position.x <= 0) {
+                    crashOccurred = true;
+                    car1.rotation.z = -0.2;
+                    car2.rotation.z = 0.2;
+                    car1.position.y = 0.5;
+                    car2.position.y = 0.5;
+                    if(logoMesh) logoMesh.visible = true;
+                }
+            }
+
+            // Rotate sky
+            sky.material.uniforms['sunPosition'].value.rotateY(0.0001);
+
+            renderer.render(scene, camera);
         }
 
+        // Handle window resize
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
         // ... [Keep rest of the animation and scene setup code] ...
     </script>
 </body>
